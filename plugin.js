@@ -3,28 +3,16 @@ module.exports = function(babel) {
 
 	return {
 		visitor: {
-
-			CallExpression: function(path, state) {
-
-				const callee = path.node.callee;
-
-				if (calleeDoesNotMatch(t, callee)) {
-					return;
+			CallExpression: function(path) {
+				if (calleeDoesMatch(t, path.node.callee)
+					&& argumentDoesMatch(t, path.node.arguments)) {
+					
+					replacePath(t, path);
 				}
-
-				if (argumentDoesNotMatch(t, path.node.arguments)) {
-					return;
-				}
-
-				replacePath(t, path);
 			}
 		}
 	};
 };
-
-function calleeDoesNotMatch(t, callee) {
-	return !calleeDoesMatch(t, callee);
-}
 
 function calleeDoesMatch(t, callee) {
 	return t.isMemberExpression(callee)
@@ -32,10 +20,6 @@ function calleeDoesMatch(t, callee) {
 		&& callee.property
 		&& t.isIdentifier(callee.object, { name: 'React' })
 		&& t.isIdentifier(callee.property, { name: 'createElement' });
-}
-
-function argumentDoesNotMatch(t, nodeArguments) {
-	return !argumentDoesMatch(t, nodeArguments);
 }
 
 function argumentDoesMatch(t, nodeArguments) {
@@ -55,7 +39,7 @@ function argumentDoesMatch(t, nodeArguments) {
 			if (t.isIdentifier(argument)) {
 				// <Component {...otherProps} />
 				// check scope to resolve otherProps key/value pairs
-				const variableName = argument.name;
+				// const variableName = argument.name;
 			}
 		}
 	}

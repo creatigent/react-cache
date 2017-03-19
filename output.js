@@ -1,7 +1,7 @@
 'use strict';
 
 function fn(a, b) {
-	return ReactCache.cacheElement('div', { cache: true, a: 1 });
+	return ReactCache.createElement('div', { cache: true, a: 1 });
 }
 
 function fn2(a, b) {
