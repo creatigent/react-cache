@@ -33,11 +33,41 @@ const createCachedElement = (prefix, key) => {
 
 };
 
+/**
+ * ReactCache.createElement
+ * Wrapper around React.createElement
+ *
+ * Usage:
+ * https://gist.github.com/msuperina/2b87d781ae5455ce674961aa33276d5f
+ * 
+ * Always rerender, unless A has lifecycle and sets shouldComponentUpdate
+ * If using babel-plugin-react-cache then ReactCache.createElement should never 
+ * face this case
+ * ReactCache.createElement('A', { a })
+ *
+ * Rerender only when b changes
+ * ReactCache.createElement('B', { b, cache: 'b' })   
+ *
+ * If using babel-plugin-react-cache, also works on computed values
+ * ReactCache.createElement('C' { computed, cache: 'computed' })
+ * 
+ * If using babel-plugin-react-cache, also works on outer scope variables
+ * ReactCache.createElement('D' {outerScopeVariable, cache: 'outerScopeVariable' })
+ * 
+ * Cache the result of a function, then rerender only if the result has changed
+ * ReactCache.createElement('E', { e: a + 2b, cache: () => a + 2b })
+ * 
+ * Do not rerender if none of the props has changed
+ * ReactCache.createElement('F', { a, b, cache: true })
+ * 
+ * Never rerender
+ * ReactCache.createElement('S', { static })   
+ */
 const createElement = (type, config, children) => {
 
 	if (!config || !config.cache) {
 		return React.createElement(type, config, children);
-	}
+	} 
 
 	const { cacheKey } = config;
 	if (!cacheKey) {
