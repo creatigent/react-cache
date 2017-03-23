@@ -4,12 +4,12 @@ const container = {};
 
 const isNotValid = key => !(key > 0 || key === 0);
 
-const accessContext = key => {
+const accessCache = key => {
 
     if (isNotValid(key)) {
         throw new Error(
             'ReactCache.cacheElement needs a unique key number to create a cached element.\n' +
-            'Usage: ReactCache.cacheElement(key)(type, config, children)\n' +
+            'Usage: ReactCache.cacheElement(key)(type, props, children)\n' +
             '(hint: you can use namespaces to generate a unique key).'
         );
     }
@@ -19,27 +19,22 @@ const accessContext = key => {
     }
 
     return {
-        context: container[key],
-        ignoreContext: (type, config, children) => {
-            const element = React.createElement(type, config, children);
+        cache: container[key],
+        ignoreCache: (type, props, children) => {
+            const element = React.createElement(type, props, children);
             return {
                 andReturnElement: () => element
             };
         },
-        setContext: (type, config, children) => {
-            const element = React.createElement(type, config, children);
-            const context = container[key] = { 
-                config, 
+        setCache: (type, props, children) => {
+            const element = React.createElement(type, props, children);
+            const cache = container[key] = { 
+                props, 
                 element
             };
-            const toReturn = {
-                andReturnElement: () => element,
-                withFnValue: fnValue => {
-                    context.fnValue = fnValue;
-                    return toReturn;
-                }
+            return {
+                andReturnElement: () => element
             };
-            return toReturn;
         }
     };
 };
@@ -65,78 +60,62 @@ const accessContext = key => {
  * If using babel-plugin-react-cache, also works on outer scope variables
  * ReactCache.createElement('D' {outerScopeVariable, cache: 'outerScopeVariable' })
  * 
- * Cache the result of a function, then rerender only if the result has changed
- * ReactCache.createElement('E', { e: a + 2b, cache: () => a + 2b })
- * 
  * Do not rerender if none of the props has changed
- * ReactCache.createElement('F', { a, b, cache: true })
+ * ReactCache.createElement('E', { a, b, cache: true })
  * 
  * Never rerender
  * ReactCache.createElement('S', { static })   
  */
 const cacheElement = key => {
 
-    const { context, ignoreContext, setContext } = accessContext(key);
+    const { cache, ignoreCache, setCache } = accessCache(key);
 
-    return function createElement(type, config, children) {
+    return function createElement(type, props, children) {
         
-        const cache = config && config.cache;
+        const cacheProp = props && props.cache;
 
-        if (!cache && !config.static) {
-            return ignoreContext(type, config, children)
+        if (!cacheProp && !props.static) {
+            return ignoreCache(type, props, children)
                 .andReturnElement();
         }         
 
-        if (!context) {
-            return setContext(type, config, children)
-                .withFnValue((typeof cache === 'function') ? cache(config) : null)
+        if (!cache) {
+            return setCache(type, props, children)
                 .andReturnElement();
         }
 
-        if (config.static) {
-            return context.element;
+        if (props.static) {
+            return cache.element;
         }
 
-        if (typeof cache === 'string') {
+        if (typeof cacheProp === 'string') {
 
-            const next = config[cache];
+            const next = props[cacheProp];
 
             if (next === undefined) {
-                return ignoreContext(type, config, children)
+                return ignoreCache(type, props, children)
                     .andReturnElement();     
             }
 
-            return (context.config[cache] !== next)
-                ? setContext(type, config, children).andReturnElement()
-                : context.element;
+            return (cache.props[cacheProp] !== next)
+                ? setCache(type, props, children).andReturnElement()
+                : cache.element;
         }
 
-        if (cache === true) {
+        if (cacheProp === true) {
 
-            const hasChanged = Object.getOwnPropertyNames(config)
+            const hasChanged = Object.getOwnPropertyNames(props)
                 .filter(name => name !== 'cache')
                 .reduce(
                     (changed, name) => 
                         changed 
-                        || (context.config[name] !== config[name]),
+                        || (cache.props[name] !== props[name]),
                     false
                 );
 
             return hasChanged
-                ? setContext(type, config, children).andReturnElement()
-                : context.element;
-
-        }
-
-        if (typeof cache === 'function') {
-
-            const fnValue = cache(config);
-
-            return (fnValue !== context.fnValue)
-                ? setContext(type, config, children)
-                    .withFnValue(fnValue)
-                    .andReturnElement()
-                : context.element;
+                ? setCache(type, props, children).andReturnElement()
+                : cache.element;
         }
     };
 };

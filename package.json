@@ -11,8 +11,8 @@
     "lint:test": "cross-env NODE_PATH=. eslint test/**",
     "prepublish": "npm run build",
     "pretest": "npm run lint:src && npm run lint:test",
-    "test": "cross-env NODE_PATH=. jest --colors --no-cache",
-    "test:watch": "npm run test --watch"
+    "test": "cross-env NODE_PATH=. jest --colors --no-cache --watchAll",
+    "test:watch": "npm run test"
   },
   "repository": {
     "type": "git",

@@ -99,30 +99,6 @@ describe('ReactCache.createElement', () => {
 
     });
 
-    describe('ReactCache.createElement(\'C\', { c: a + 2b, cache: () => a + 2b })', () => {
-        
-        const fn = config => config.a + 2 * config.b;
-
-        it('cache the result of the function, rerender if the result has changed', () => {
-
-            expect.assertions(1);
-            return run(null, { a: 1, b: 1, cache: fn }, { a: 1, b: 2, cache: fn })
-                .then(count => {
-                    expect(count).toBe(2);
-                });
-        });
-
-        it('do not rerender if the result is the same', () => {
-
-            expect.assertions(1);
-            return run(null, { a: 1, b: 1, cache: fn }, { a: 1, b: 1, cache: fn })
-                .then(count => {
-                    expect(count).toBe(1);
-                });
-        });
-    
-    });
-
     describe('ReactCache.createElement(\'C\', { a, b, cache: true })', () => {
         
         it('rerender if any of the props has changed', () => {
