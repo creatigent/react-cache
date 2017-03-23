@@ -1,40 +1,51 @@
 import * as React from 'react';
 
-const cache = {};
+const container = {};
 
-const createCache = (type, config, children) => {
-	return { 
-		element: React.createElement(type, config, children),
-		props: config
-	};
-};
+const isNotValid = key => !(key > 0 || key === 0);
 
-const createCachedElement = (prefix, key) => {
+const accessContext = key => {
 
-	const fullKey = `prefix.${key}`;
+    if (isNotValid(key)) {
+        throw new Error(
+            'ReactCache.cacheElement needs a unique key number to create a cached element.\n' +
+            'Usage: ReactCache.cacheElement(key)(type, config, children)\n' +
+            '(hint: you can use namespaces to generate a unique key).'
+        );
+    }
 
-	return (type, config, children) => {
-		if(!cache[fullKey]) {
-			cache[fullKey] = createCache(type, config, children);
-		} else {
-			const props = cache[fullKey].props || {};
-			const shouldUpdate = Object.getOwnPropertyNames(config).reduce(
-				(should, name) => should || (name !== 'cache') && (props[name] !== config[name]),
-				false
-			);
+    if (!container[key]) {
+        container[key] = null;
+    }
 
-			if (shouldUpdate) {
-				cache[fullKey] = createCache(type, config, children);
-			}
-		}
-
-		return cache[fullKey].element;
-	};
-
+    return {
+        context: container[key],
+        ignoreContext: (type, config, children) => {
+            const element = React.createElement(type, config, children);
+            return {
+                andReturnElement: () => element
+            };
+        },
+        setContext: (type, config, children) => {
+            const element = React.createElement(type, config, children);
+            const context = container[key] = { 
+                config, 
+                element
+            };
+            const toReturn = {
+                andReturnElement: () => element,
+                withFnValue: fnValue => {
+                    context.fnValue = fnValue;
+                    return toReturn;
+                }
+            };
+            return toReturn;
+        }
+    };
 };
 
 /**
- * ReactCache.createElement
+ * ReactCache.createElement()
  * Wrapper around React.createElement
  *
  * Usage:
@@ -63,37 +74,71 @@ const createCachedElement = (prefix, key) => {
  * Never rerender
  * ReactCache.createElement('S', { static })   
  */
-const createElement = (type, config, children) => {
+const cacheElement = key => {
 
-	if (!config || !config.cache) {
-		return React.createElement(type, config, children);
-	} 
+    const { context, ignoreContext, setContext } = accessContext(key);
 
-	const { cacheKey } = config;
-	if (!cacheKey) {
-		throw new Error(
-			'A cached element needs a cache key and it must be unique\n' +
-			'for a given Component type.\n' +
-			'The component type is used to prefix the final key.\n' +
-			'Please check props.cache = { key: unique_key }\n' +
-			'(hint: you can use namespaces to generate a unique key).'
-		);
-	}
+    return function createElement(type, config, children) {
+        
+        const cache = config && config.cache;
 
-	const prefix = type.displayName 
-		|| type.name 
-		|| type.toString && type.toString();
+        if (!cache && !config.static) {
+            return ignoreContext(type, config, children)
+                .andReturnElement();
+        }         
 
-	if (!prefix) {
-		throw new Error(
-			'It is impossible to resolve the Component type to generate a key prefix.\n' +
-			'The prefix is resolved in the following order:\n' +
-			'Component.displayName > Component.name > Component.toString()\n' +
-			'Please add one of the above properties to the component.'
-		);	
-	}
+        if (!context) {
+            return setContext(type, config, children)
+                .withFnValue((typeof cache === 'function') ? cache(config) : null)
+                .andReturnElement();
+        }
 
-	return createCachedElement(prefix, cacheKey)(type, config, children);
+        if (config.static) {
+            return context.element;
+        }
+
+        if (typeof cache === 'string') {
+
+            const next = config[cache];
+
+            if (next === undefined) {
+                return ignoreContext(type, config, children)
+                    .andReturnElement();     
+            }
+
+            return (context.config[cache] !== next)
+                ? setContext(type, config, children).andReturnElement()
+                : context.element;
+        }
+
+        if (cache === true) {
+
+            const hasChanged = Object.getOwnPropertyNames(config)
+                .filter(name => name !== 'cache')
+                .reduce(
+                    (changed, name) => 
+                        changed 
+                        || (context.config[name] !== config[name]),
+                    false
+                );
+
+            return hasChanged
+                ? setContext(type, config, children).andReturnElement()
+                : context.element;
+
+        }
+
+        if (typeof cache === 'function') {
+
+            const fnValue = cache(config);
+
+            return (fnValue !== context.fnValue)
+                ? setContext(type, config, children)
+                    .withFnValue(fnValue)
+                    .andReturnElement()
+                : context.element;
+        }
+    };
 };
 
-export { createElement };
+export { cacheElement };
