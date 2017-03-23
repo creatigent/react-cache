@@ -2,42 +2,9 @@ import * as React from 'react';
 
 const container = {};
 
-const isNotValid = key => !(key > 0 || key === 0);
-
-const accessCache = key => {
-
-    if (isNotValid(key)) {
-        throw new Error(
-            'ReactCache.cacheElement needs a unique key number to create a cached element.\n' +
-            'Usage: ReactCache.cacheElement(key)(type, props, children)\n' +
-            '(hint: you can use namespaces to generate a unique key).'
-        );
-    }
-
-    if (!container[key]) {
-        container[key] = null;
-    }
-
-    return {
-        cache: container[key],
-        ignoreCache: (type, props, children) => {
-            const element = React.createElement(type, props, children);
-            return {
-                andReturnElement: () => element
-            };
-        },
-        setCache: (type, props, children) => {
-            const element = React.createElement(type, props, children);
-            const cache = container[key] = { 
-                props, 
-                element
-            };
-            return {
-                andReturnElement: () => element
-            };
-        }
-    };
-};
+const isNotValid = key => (typeof key === 'string') ? false
+    : ((typeof key === 'number') && (key >= 0)) ? false
+    : true;
 
 /**
  * ReactCache.createElement()
@@ -60,64 +27,125 @@ const accessCache = key => {
  * If using babel-plugin-react-cache, also works on outer scope variables
  * ReactCache.createElement('D' {outerScopeVariable, cache: 'outerScopeVariable' })
  * 
+ * Cache the result of a function, then rerender only if the result has changed
+ * ReactCache.createElement('E', { e: a + 2b, cache: () => a + 2b })
+ * 
  * Do not rerender if none of the props has changed
- * ReactCache.createElement('E', { a, b, cache: true })
+ * ReactCache.createElement('F', { a, b, cache: true })
  * 
  * Never rerender
  * ReactCache.createElement('S', { static })   
  */
-const cacheElement = key => {
+const createElement = key => {
 
-    const { cache, ignoreCache, setCache } = accessCache(key);
+    if (isNotValid(key)) {
+        throw new Error(
+            'ReactCache.cacheElement needs a unique key (number or string) to create a cached element.\n' +
+            'Usage: ReactCache.cacheElement(key)(type, props, children)\n' +
+            'Hint: you can use namespaces to generate a unique key.'
+        );
+    }
 
-    return function createElement(type, props, children) {
+    const context = container[key];
+
+    const createElement = (type, props, children) => {
         
         const cacheProp = props && props.cache;
 
         if (!cacheProp && !props.static) {
-            return ignoreCache(type, props, children)
-                .andReturnElement();
+            return React.createElement(type, props, children);
         }         
 
-        if (!cache) {
-            return setCache(type, props, children)
-                .andReturnElement();
+        if (!context) {
+            const next = cacheProp === true ? props
+                : typeof cacheProp === 'string' ? props[cacheProp]
+                : typeof cacheProp === 'function' && cacheProp(props);
+
+            const element = React.createElement(type, props, children);
+            container[key] = { 
+                value: next, 
+                element
+            };
+
+            return element;
         }
 
         if (props.static) {
-            return cache.element;
+            return context.element;
         }
 
-        if (typeof cacheProp === 'string') {
-
-            const next = props[cacheProp];
-
-            if (next === undefined) {
-                return ignoreCache(type, props, children)
-                    .andReturnElement();     
-            }
-
-            return (cache.props[cacheProp] !== next)
-                ? setCache(type, props, children).andReturnElement()
-                : cache.element;
-        }
-
-        if (cacheProp === true) {
-
-            const hasChanged = Object.getOwnPropertyNames(props)
-                .filter(name => name !== 'cache')
-                .reduce(
-                    (changed, name) => 
-                        changed 
-                        || (cache.props[name] !== props[name]),
-                    false
-                );
-
-            return hasChanged
-                ? setCache(type, props, children).andReturnElement()
-                : cache.element;
-        }
+        return getElement(key, cacheProp, context, type, props, children);
     };
+    createElement.propTypes = {
+        cache: React.PropTypes.oneOfType([
+            React.PropTypes.bool,
+            React.PropTypes.string,
+            React.PropTypes.func
+        ]),
+        'static': React.PropTypes.bool
+    };
+
+    return createElement;
 };
 
-export { cacheElement };
+export { createElement };
+
+function resolveNextTrue(cacheProp, props, cache) {
+    return { 
+        hasChanged: Object.getOwnPropertyNames(props)
+            .filter(name => name !== 'cache')
+            .reduce(
+                (changed, name) => 
+                    changed 
+                    || (cache.value[name] !== props[name]),
+                false
+            ),
+        next: props 
+    };
+}
+
+function resolveNextString(cacheProp, props, cache) {
+    const next = props[cacheProp];
+    return {
+        hasChanged: next === undefined || (cache.value !== next),
+        next
+    };
+}
+
+function resolveNextBoolean(cacheProp, props, cache) {
+    const next = cacheProp(props);
+    return {
+        hasChanged: next !== cache.value,
+        next
+    };
+}
+
+function getElement(key, cacheProp, cache, type, props, children) {
+
+    let resolveNext;
+
+    if (cacheProp === true) {
+        resolveNext = resolveNextTrue;
+    }
+
+    if (typeof cacheProp === 'string') {
+        resolveNext = resolveNextString;
+    }
+
+    if (typeof cacheProp === 'function') {
+        resolveNext = resolveNextBoolean;
+    }
+
+    const { hasChanged, next } = resolveNext(cacheProp, props, cache);
+
+    if (hasChanged) {
+        const element = React.createElement(type, props, children);
+        container[key] = { 
+            value: next, 
+            element
+        };
+        return element;
+    } else {
+        return cache.element;
+    }
+}

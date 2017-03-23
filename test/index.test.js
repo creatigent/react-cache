@@ -36,7 +36,7 @@ const run = (cache, initialState, nextState) => {
                     this.state, 
                     cache ? { cache } : null
                 );
-                return ReactCache.cacheElement(key)(Component, propsToPass);
+                return ReactCache.createElement(key)(Component, propsToPass);
             }
         } 
 
@@ -47,7 +47,58 @@ const run = (cache, initialState, nextState) => {
 
 describe('ReactCache.createElement', () => {
 
-    describe('ReactCache.createElement(\'A\', { a })', () => {
+    describe('ReactCache.createElement(key): key can be', () => {
+
+        it('a positive number', () => {
+            const peter = ReactCache.createElement(1);
+            expect(peter).toBeTruthy();
+        });
+
+        it('a string', () => {
+            const steven = ReactCache.createElement('a');
+            expect(steven).toBeTruthy();
+        });
+
+        it('nothing else', () => {
+            expect(() => ReactCache.createElement(-1)).toThrow();
+            expect(() => ReactCache.createElement(NaN)).toThrow();
+            expect(() => ReactCache.createElement(undefined)).toThrow();
+            expect(() => ReactCache.createElement(null)).toThrow();
+            expect(() => ReactCache.createElement(true)).toThrow();
+            expect(() => ReactCache.createElement(false)).toThrow();
+            expect(() => ReactCache.createElement(Boolean(true))).toThrow();
+            expect(() => ReactCache.createElement({})).toThrow();
+            expect(() => ReactCache.createElement([])).toThrow();
+            expect(() => ReactCache.createElement(
+                (() => {
+                    const A = {};
+                    return new A();
+                })()
+            )).toThrow();
+        });
+    });
+
+    describe('ReactCache.createElement(key)', () => {
+
+        it('is a function', () => {
+            expect(typeof ReactCache.createElement(1) === 'function');
+            expect(ReactCache.createElement(1).name === 'createElement');
+        });
+
+        it('two calls with the same key return different functions', () => {
+            const peter = ReactCache.createElement(1);
+            const steven = ReactCache.createElement(1);
+            expect(peter).not.toBe(steven);
+        });
+
+        it('two calls with different keys return different functions', () => {
+            const peter = ReactCache.createElement(1);
+            const steven = ReactCache.createElement(2);
+            expect(peter).not.toBe(steven);
+        });
+    });
+
+    describe('ReactCache.createElement(key)(\'A\', { a })', () => {
        
         it('rerender whether \'a\' changes', () => {
 
@@ -68,7 +119,7 @@ describe('ReactCache.createElement', () => {
         });
     });
 
-    describe('ReactCache.createElement(\'A\', { a, cache: \'a\' })', () => {
+    describe('ReactCache.createElement(key)(\'A\', { a, cache: \'a\' })', () => {
 
         it('rerender when \'a\' is not passed', ()  => {
 
@@ -99,7 +150,31 @@ describe('ReactCache.createElement', () => {
 
     });
 
-    describe('ReactCache.createElement(\'C\', { a, b, cache: true })', () => {
+    describe('ReactCache.createElement(key)(\'C\', { c: a + 2b, cache: () => a + 2b })', () => {
+        
+        const fn = config => config.a + 2 * config.b;
+
+        it('cache the result of the function, rerender if the result has changed', () => {
+
+            expect.assertions(1);
+            return run(null, { a: 1, b: 1, cache: fn }, { a: 1, b: 2, cache: fn })
+                .then(count => {
+                    expect(count).toBe(2);
+                });
+        });
+
+        it('do not rerender if the result is the same', () => {
+
+            expect.assertions(1);
+            return run(null, { a: 1, b: 1, cache: fn }, { a: 1, b: 1, cache: fn })
+                .then(count => {
+                    expect(count).toBe(1);
+                });
+        });
+    
+    });
+
+    describe('ReactCache.createElement(key)(\'C\', { a, b, cache: true })', () => {
         
         it('rerender if any of the props has changed', () => {
 
@@ -121,7 +196,7 @@ describe('ReactCache.createElement', () => {
 
     });
 
-    describe('ReactCache.createElement(\'C\', { a, b, static: true })', () => {
+    describe('ReactCache.createElement(key)(\'C\', { a, b, static: true })', () => {
         it('never rerender', () => {
 
             expect.assertions(1);
