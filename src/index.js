@@ -46,7 +46,7 @@ const createElement = key => {
         );
     }
 
-    const context = container[key];
+    const cache = container[key];
 
     const createElement = (type, props, children) => {
         
@@ -56,7 +56,7 @@ const createElement = key => {
             return React.createElement(type, props, children);
         }         
 
-        if (!context) {
+        if (!cache) {
             const next = cacheProp === true ? props
                 : typeof cacheProp === 'string' ? props[cacheProp]
                 : typeof cacheProp === 'function' && cacheProp(props);
@@ -71,10 +71,10 @@ const createElement = key => {
         }
 
         if (props.static) {
-            return context.element;
+            return cache.element;
         }
 
-        return getElement(key, cacheProp, context, type, props, children);
+        return getElement(key, cacheProp, cache, type, props, children);
     };
     createElement.propTypes = {
         cache: React.PropTypes.oneOfType([
