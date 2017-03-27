@@ -28,7 +28,8 @@ const run = (cache, initialState, nextState) => {
             }
 
             render() {
-                return <Component cache={cache} a={this.state.a} />;
+                const { a } = this.state;
+                return <Component cache={cache} a={a} />;
             }
         } 
 
