@@ -24,7 +24,7 @@ npm install --save react-cache babel-plugin-transform-react-jsx
 
 Rerender only when a changes
 ```jsx      
-<A a={a} b={b} cache={(nextProps, oldProps) => nextProps.a !== oldProps.a} />
+<A a={a} b={b} cache={(nextProps, oldProps) => nextProps.a === oldProps.a} />
 ```
 
 Always rerender
